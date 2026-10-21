@@ -1,0 +1,14 @@
+{
+  "name": "velisect",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Velisect: a first-person Backrooms extraction shooter in Unreal Engine 5.8, its assets prepared in Blender.",
+  "scripts": {
+    "test": "node tools/unreal.mjs test",
+    "unreal": "node tools/unreal.mjs",
+    "compile": "node tools/unreal.mjs compile",
+    "package": "node tools/unreal.mjs package",
+    "open": "node tools/unreal.mjs open",
+    "play": "node tools/unreal.mjs play"
+  }
+}

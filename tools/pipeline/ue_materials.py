@@ -5,6 +5,8 @@ tools = unreal.AssetToolsHelpers.get_asset_tools()
 MAT = "/Game/Velisect/Materials"
 WHITE = unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture")
 FLAT = unreal.load_asset("/Engine/EngineMaterials/DefaultNormal")
+# a linear (non-sRGB) default for Masks samplers: the cooker rejects WhiteSquareTexture there (M2)
+MASK_DEFAULT = "/Game/Velisect/Weapons/Rifle/Textures/T_Rifle_Body_Mixed_AO"
 BR_TEX = "/Game/Velisect/Environment/Backrooms/Textures/"
 
 
@@ -128,15 +130,15 @@ def build_pbr():
     tint = g.op(unreal.MaterialExpressionMultiply, bc, "RGB", g.vec("Tint", unreal.LinearColor(1, 1, 1, 1), -900, -480), "", -500, -300)
     g.out(tint, "", unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.tex("NormalTex", FLAT, -900, 0, normal=True), "RGB", unreal.MaterialProperty.MP_NORMAL)
-    met_tex = g.tex("MetallicTex", WHITE, -900, 260)
+    met_tex = g.tex("MetallicTex", unreal.load_asset(MASK_DEFAULT), -900, 260)
     met_tex.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
     met = g.op(unreal.MaterialExpressionMultiply, met_tex, "R", g.scalar("MetallicScale", 1.0, -900, 440), "", -500, 260)
     g.out(met, "", unreal.MaterialProperty.MP_METALLIC)
-    rough_tex = g.tex("RoughnessTex", WHITE, -900, 560)
+    rough_tex = g.tex("RoughnessTex", unreal.load_asset(MASK_DEFAULT), -900, 560)
     rough_tex.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
     rough = g.op(unreal.MaterialExpressionMultiply, rough_tex, "R", g.scalar("RoughnessScale", 1.0, -900, 740), "", -500, 560)
     g.out(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
-    ao_tex = g.tex("AOTex", WHITE, -900, 860)
+    ao_tex = g.tex("AOTex", unreal.load_asset(MASK_DEFAULT), -900, 860)
     ao_tex.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
     g.out(ao_tex, "R", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
     MEL.recompile_material(m)

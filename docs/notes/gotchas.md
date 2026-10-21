@@ -1,0 +1,26 @@
+# Gotchas found while building
+
+One trap per bullet, under its topic. `Grep "^## " gotchas.md` for the map.
+
+## Builds
+- The Mournhollow editor's Live Coding blocks UBT on the shared engine ("Unable to build while Live Coding is active"): pass `-NoHotReloadFromIDE` (the tool does). Close only the Velisect editor before `compile`.
+- Adding UPROPERTYs needs a full compile with the editor closed; Live Coding can't. Save first: closing the editor can raise a Save Content dialog (the navmesh dirties the map).
+- `UNavigationSystemV1::GetCurrent<T>` doesn't compile here; use `FNavigationSystem::GetCurrent<UNavigationSystemV1>(World)`.
+- A test's table of `TPair<const TCHAR*, TArray<...>>` won't brace-initialise (C2440): use a small struct.
+- The project sits in OneDrive, which locked staging files mid-build ("Access to the path ... is denied"). Staging and the packaged game go to `%LOCALAPPDATA%\Velisect` (`tools/unreal.mjs`). Saved/Intermediate still sync; moving the project out of OneDrive would be better (ask the user).
+- The cook succeeds while a material fails to compile, and the game silently uses the default material; `package` now greps for it. M_PBR's Masks samplers defaulted to the sRGB `WhiteSquareTexture` (fixed in M2 by `fix_pbr_defaults.py`).
+
+## MCP, Python, Blender
+- Two editors run on this engine: Mournhollow's MCP owns port 8000. Velisect's is 8010 (`-ModelContextProtocolPort=8010`, or `ModelContextProtocol.StartServer 8010` from the console).
+- `CaptureViewport` renders the **editor** world even during PIE; for an outside view in PIE move the level's `DebugCam` and `SetViewTargetWithBlend` to it, then `CaptureEditorImage`. Python can't spawn actors in the PIE world.
+- MCP tool args: every schema field must be present (`CaptureViewport` needs `annotations` even when unused). Images come back inside a text payload (`returnValue.image.data` or `returnValue.data`).
+- Unreal Python: `EditorLevelLibrary` is deprecated (use the subsystems); post-process fields are `auto_exposure_min_brightness`, `film_grain_intensity`; spawned rect lights default to Stationary: set Movable (static lighting is off) or they draw red errors.
+- Blender's installed add-on is ahujasid's MCP for Blender (`{"type":"execute_code","params":{"code":...}}` on 9876): the Claude desktop "Blender" extension speaks Blender Lab's protocol and times out. `.mcp.json`'s `blender` (`uvx blender-mcp`) matches the add-on. Its exec runs on a timer: `bpy.ops.wm.read_homefile` there loses context; clear objects instead and use `context.temp_override` with a VIEW_3D area.
+- A Blender splash screen blocks nothing, but an open modal does; check a screenshot when the socket stops answering.
+
+## Assets and animation
+- Mixamo FBX through Interchange: bones import lowercase without the `mixamorig:` prefix; `create_physics_asset` on import is ignored (make them with `SkeletalMeshEditorSubsystem.create_physics_asset`).
+- Mixamo takes carry forward travel on the hips (Sprint 3.6 m per cycle); export them in place from Blender.
+- The upper-body layer must blend its root in component space, and the spine's aim pitch is inverted on this rig (see `animation.md`).
+- Vicevoxel crates import at wildly different scales (a 3 m crate): `ue_level.py`'s props are scaled to target heights after placing.
+- With every panel lit and shadowed, VSM one-pass projection overflows: rect lights on a checkerboard, shadows on half of those (36).
