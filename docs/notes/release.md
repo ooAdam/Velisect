@@ -17,7 +17,8 @@ A running list so nothing is forgotten. Tick items as they land; add new ones as
 - [ ] The inspiration images never go in the game.
 - [ ] Backrooms is open folklore; copy nothing from named, owned works (e.g. Kane Pixels' series).
 - [ ] Replace the synthesized placeholder audio (gunshot, hum) with licensed or custom sound.
-- [ ] Every asset is rebuilt by a committed script in `tools/pipeline/` (no chat-only steps).
+- [x] Blender assets rebuild headless from committed scripts (`unreal.mjs blender`; kit, textures and characters verified 2026-10-21, textures byte-identical).
+- [ ] Every Unreal-side asset step (`ue_*.py`) is likewise re-runnable from a clean import.
 
 ## Player must-haves
 - [ ] Settings menu: graphics, mouse sensitivity, key rebinding, audio.

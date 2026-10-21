@@ -6,7 +6,7 @@
 //   play      start the packaged game, as Play Velisect.bat does
 //   open      open the editor with its MCP server on port 8010 (8000 belongs to the Mournhollow editor)
 //   py <file> run a Python file inside the open Velisect editor (remote execution; editor automation)
-//   blender <file>  run a Python file inside the open Blender (its MCP add-on's socket, port 9876)
+//   blender <file>  run a Blender pipeline script in a fresh headless Blender (factory settings)
 //   shot [name]     in the open editor: start PIE, wait, save the editor's image to Saved/ToolLogs/shots/<name>.png, stop PIE
 //
 // Usage: node tools/unreal.mjs <step> [arg]... [--verbose]   (no steps = compile test)

@@ -1,6 +1,7 @@
 import bpy, os, json
 ROOT = r"C:\ProgramData\Epic\EpicGamesLauncher\VaultCache\FabLibrary\FPS_Guns_4K_-_Rifle_1-a7e70f32\fbx\fps_guns_4k_rifle_1_extracted\Velisect"
 def ctx():
+    if bpy.app.background: return {}  # headless (blx.py): the io operators need no viewport
     win = bpy.context.window_manager.windows[0]
     area = next(a for a in win.screen.areas if a.type == 'VIEW_3D')
     return dict(window=win, screen=win.screen, area=area, region=next(r for r in area.regions if r.type=='WINDOW'))
