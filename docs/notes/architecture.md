@@ -17,4 +17,4 @@
 - Assets load by soft path (C++ defaults, overridable in the BPs); the cooker gets them via `DirectoriesToAlwaysCook=/Game/Velisect` in `DefaultGame.ini`.
 
 ## Commands
-`node tools/unreal.mjs compile | test | package | play | open | py <file> | blender <file> | shot [name]` (header of `tools/unreal.mjs`). Logs: `Saved/ToolLogs/`; shots `Saved/ToolLogs/shots/`; the packaged game `%LOCALAPPDATA%\Velisect\Packaged\Windows` (its log: `Velisect\Saved\Logs\Velisect.log` there).
+`node tools/unreal.mjs compile | test | package | play | open | py <file> | blender <file> | shot [name]` (header of `tools/unreal.mjs`). Logs: `Saved/ToolLogs/`; shots `Saved/ToolLogs/shots/`; the packaged game `Packaged/Windows` (its log: `Packaged/Windows/Velisect/Saved/Logs/Velisect.log`).

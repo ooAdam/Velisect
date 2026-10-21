@@ -2,7 +2,7 @@
 //
 //   compile   UnrealBuildTool compiles the C++ module for the editor (Source/Velisect)
 //   test      the "Velisect.*" automation tests, headless in the editor (VS_TEST=Velisect.Content runs one group)
-//   package   compile, cook and pack the game: %LOCALAPPDATA%/Velisect/Packaged/Windows/Velisect.exe
+//   package   compile, cook and pack the game: Packaged/Windows/Velisect.exe
 //   play      start the packaged game, as Play Velisect.bat does
 //   open      open the editor with its MCP server on port 8010 (8000 belongs to the Mournhollow editor)
 //   py <file> run a Python file inside the open Velisect editor (remote execution; editor automation)
@@ -21,9 +21,7 @@ import { fileURLToPath } from 'node:url';
 const project = join(dirname(fileURLToPath(import.meta.url)), '..');
 const uproject = join(project, 'Velisect.uproject');
 const pipeline = join(project, 'tools', 'pipeline');
-// build output lives outside OneDrive (the project folder syncs): OneDrive locks staging files mid-build (M2)
-const outRoot = join(process.env.LOCALAPPDATA, 'Velisect');
-const gameDir = join(outRoot, 'Packaged', 'Windows');
+const gameDir = join(project, 'Packaged', 'Windows');
 const gameExe = join(gameDir, 'Velisect.exe');
 const toolLogs = join(project, 'Saved', 'ToolLogs');
 
@@ -102,7 +100,7 @@ const steps = {
     if (velisectEditorOpen()) { console.error('The Velisect editor is open: ask the user to close it, then package.'); return 1; }
     const code = await run(dotnet, [join(engine, 'Engine', 'Binaries', 'DotNET', 'AutomationTool', 'AutomationTool.dll'), 'BuildCookRun',
       `-project=${uproject}`, '-noP4', '-platform=Win64', '-clientconfig=Development', '-build', '-cook', '-stage', '-pak', '-iostore', '-prereqs',
-      `-stagingdirectory=${join(outRoot, 'Staged')}`, '-archive', `-archivedirectory=${join(outRoot, 'Packaged')}`, '-unattended', '-utf8output', '-nocompileeditor', '-NoHotReloadFromIDE']);
+      '-archive', `-archivedirectory=${join(project, 'Packaged')}`, '-unattended', '-utf8output', '-nocompileeditor', '-NoHotReloadFromIDE']);
     if (code) return code;
     // the cook succeeds even when a material fails and the game falls back to the default one: fail it here
     const lines = readFileSync(stepLog, 'utf8').split(/\r?\n/);

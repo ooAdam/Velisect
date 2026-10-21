@@ -1,5 +1,5 @@
 import unreal, os, glob
-SA = r"C:\Users\adanr\OneDrive\Documents\Unreal Projects\Velisect\SourceArt"
+SA = r"C:\Users\adanr\velisect\SourceArt"
 SRC = r"C:\ProgramData\Epic\EpicGamesLauncher\VaultCache\FabLibrary\FPS_Guns_4K_-_Rifle_1-a7e70f32\fbx\fps_guns_4k_rifle_1_extracted\Velisect"
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 log = []

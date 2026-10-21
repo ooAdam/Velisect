@@ -3,7 +3,7 @@ import json
 import unreal
 
 E = unreal.EditorAssetLibrary
-cfg = json.load(open(r"C:\Users\adanr\OneDrive\Documents\Unreal Projects\Velisect\tools\pipeline\player_cfg.json"))
+cfg = json.load(open(r"C:\Users\adanr\velisect\tools\pipeline\player_cfg.json"))
 bp = unreal.load_asset("/Game/Velisect/Blueprints/BP_Player")
 cdo = unreal.get_default_object(unreal.BlueprintEditorLibrary.generated_class(bp))
 cdo.set_editor_property("body_offset", unreal.Vector(*cfg["body"]))

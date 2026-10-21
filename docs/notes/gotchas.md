@@ -7,7 +7,7 @@ One trap per bullet, under its topic. `Grep "^## " gotchas.md` for the map.
 - Adding UPROPERTYs needs a full compile with the editor closed; Live Coding can't. Save first: closing the editor can raise a Save Content dialog (the navmesh dirties the map).
 - `UNavigationSystemV1::GetCurrent<T>` doesn't compile here; use `FNavigationSystem::GetCurrent<UNavigationSystemV1>(World)`.
 - A test's table of `TPair<const TCHAR*, TArray<...>>` won't brace-initialise (C2440): use a small struct.
-- The project sits in OneDrive, which locked staging files mid-build ("Access to the path ... is denied"). Staging and the packaged game go to `%LOCALAPPDATA%\Velisect` (`tools/unreal.mjs`). Saved/Intermediate still sync; moving the project out of OneDrive would be better (ask the user).
+- Never keep the project in OneDrive (or any synced folder): it locked staging files mid-build ("Access to the path ... is denied") and synced GBs of Saved/Intermediate. Moved to `C:\Users\adanr\velisect` in M3; after a move, delete `Intermediate/` so UBT rebuilds its makefiles.
 - The cook succeeds while a material fails to compile, and the game silently uses the default material; `package` now greps for it. M_PBR's Masks samplers defaulted to the sRGB `WhiteSquareTexture` (fixed in M2 by `fix_pbr_defaults.py`).
 
 ## MCP, Python, Blender

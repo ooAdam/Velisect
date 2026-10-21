@@ -2,7 +2,7 @@ import unreal, os
 E = unreal.EditorAssetLibrary
 ACTORS = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 LEVELS = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
-SA = r"C:\Users\adanr\OneDrive\Documents\Unreal Projects\Velisect\SourceArt\Audio"
+SA = r"C:\Users\adanr\velisect\SourceArt\Audio"
 tasks = []
 for n in ["S_RifleShot", "S_FluorescentHum"]:
     t = unreal.AssetImportTask(); t.filename = os.path.join(SA, n + ".wav"); t.destination_path = "/Game/Velisect/Audio"

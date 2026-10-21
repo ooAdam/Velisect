@@ -3,7 +3,7 @@
 A first-person shooter in the Backrooms: endless yellow halls, damp carpet, the hum of the lights, and something wandering the floor. Go in, find what's worth taking, get back out.
 
 ## Play
-Double-click **Play Velisect.bat** (or `npm run play`); the game is built into `%LOCALAPPDATA%\Velisect\Packaged`. If it says the game isn't built: `npm run package`.
+Double-click **Play Velisect.bat** (or `npm run play`); the game is built into `Packaged\Windows`. If it says the game isn't built: `npm run package`.
 
 | Key | Action |
 |---|---|

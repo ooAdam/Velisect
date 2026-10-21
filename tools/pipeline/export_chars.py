@@ -1,6 +1,6 @@
-exec(open(r"C:\Users\adanr\OneDrive\Documents\Unreal Projects\Velisect\tools\pipeline\common_bl.py").read())
+exec(open(r"C:\Users\adanr\velisect\tools\pipeline\common_bl.py").read())
 import mathutils, re
-OUT = r"C:\Users\adanr\OneDrive\Documents\Unreal Projects\Velisect\SourceArt"
+OUT = r"C:\Users\adanr\velisect\SourceArt"
 S = mathutils.Matrix.Diagonal((-1, 1, 1, 1))  # mirror across armature-space X (the character's left/right axis)
 
 def partner(name):

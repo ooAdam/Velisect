@@ -1,6 +1,6 @@
-exec(open(r"C:\Users\adanr\OneDrive\Documents\Unreal Projects\Velisect\tools\pipeline\common_bl.py").read())
+exec(open(r"C:\Users\adanr\velisect\tools\pipeline\common_bl.py").read())
 import bmesh, numpy as np
-OUT = r"C:\Users\adanr\OneDrive\Documents\Unreal Projects\Velisect\SourceArt\Backrooms"
+OUT = r"C:\Users\adanr\velisect\SourceArt\Backrooms"
 os.makedirs(os.path.join(OUT, "Textures"), exist_ok=True)
 rng = np.random.default_rng(7)
 

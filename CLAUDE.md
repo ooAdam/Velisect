@@ -1,6 +1,6 @@
 # Velisect: notes for Claude
 
-A first-person shooter set in the Backrooms: go in, extract good loot, come back out. Unreal 5.8 C++ (this folder is the Unreal project) with Blender as the asset factory. The user's other game, **Mournhollow** (`C:\Users\adanr\mournhollow`), is unrelated: never touch its files or its editor. README.md is the player-facing description and controls.
+Lives at `C:\Users\adanr\velisect` (moved out of OneDrive in M3; never put it back in a synced folder). A first-person shooter set in the Backrooms: go in, extract good loot, come back out. Unreal 5.8 C++ (this folder is the Unreal project) with Blender as the asset factory. The user's other game, **Mournhollow** (`C:\Users\adanr\mournhollow`), is unrelated: never touch its files or its editor. README.md is the player-facing description and controls.
 
 ## Spend tokens like they're the user's (the user's ask)
 - **Start a session with `docs/notes/next.md`** (about ten lines: where things stand, what's next, which notes to open), then only the notes it names.
@@ -24,7 +24,7 @@ A first-person shooter set in the Backrooms: go in, extract good loot, come back
 - **Model per task (the user picks):** routine tuning, data and small fixes run fine on Sonnet or lower effort; new systems and animation or AI problems want Opus at high effort.
 
 ## The user's loop
-- **The game is the packaged exe** `%LOCALAPPDATA%\Velisect\Packaged\Windows\Velisect.exe` (Development; build output lives outside OneDrive, which syncs this folder), started with `Play Velisect.bat` or `npm run play`. Play-In-Editor is for Claude's checks.
+- **The game is the packaged exe** `Packaged/Windows/Velisect.exe` (Development), started with `Play Velisect.bat` or `npm run play`. Play-In-Editor is for Claude's checks.
 - The user asks → Claude builds it: C++ in `Source/Velisect`, editor automation in `tools/pipeline/ue_*.py` (run in the open editor with `node tools/unreal.mjs py <file>`), Blender work through `tools/pipeline/*.py` (`node tools/unreal.mjs blender <file>`) → test, package, look → the user plays the exe.
 - **Inspect → Plan → Checkpoint → Implement → Verify → Commit.** Present findings before large changes; start from a clean tree; verify with `test`, a `shot` of what changed, and `package`. **Commit at each verified milestone** (message `M<n>: <what>`, ending with the Co-Authored-By line). Push only once the user has set up the remote and said to.
 - **Commands** (`node tools/unreal.mjs <steps>`): `compile`, `test`, `package`, `play`, `open` (editor with MCP on 8010), `py <file>`, `blender <file>`, `shot [name]`. `compile` and `package` need the Velisect editor and the game closed: **ask the user to close them, never kill them** (the tool refuses while they're open). A C++ change reaches the game only through `package`; reaches the editor only after `compile` with the editor closed.

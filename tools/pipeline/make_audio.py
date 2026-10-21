@@ -5,7 +5,7 @@ import random
 import struct
 import wave
 
-OUT = r"C:\Users\adanr\OneDrive\Documents\Unreal Projects\Velisect\SourceArt\Audio"
+OUT = r"C:\Users\adanr\velisect\SourceArt\Audio"
 RATE = 48000
 os.makedirs(OUT, exist_ok=True)
 rng = random.Random(42)
