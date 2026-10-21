@@ -15,6 +15,7 @@ Lives at `C:\Users\adanr\velisect` (moved out of OneDrive in M3; never put it ba
   | `mcp.md` | the Unreal MCP (port 8010), the Blender socket, Python remote execution, and how to call each |
   | `tests.md` | what each automation test checks and its mutation result |
   | `history.md` | the milestone table |
+  | `release.md` | the pre-release (Steam) checklist: add to it whenever a ship-time item comes up |
 - **Never print a long output.** `node tools/unreal.mjs` is quiet: each step's whole output goes to `Saved/ToolLogs/<step>.log`; grep it for more. Long output of your own goes to a scratchpad file.
 - **Look, don't guess, but look cheaply:** `node tools/unreal.mjs shot <name>` (editor open) saves one PIE image to `Saved/ToolLogs/shots/`. One image per check, of what changed.
 - **Run the smallest check that proves the change:** `VS_TEST=Velisect.Content node tools/unreal.mjs test` for one group; the full `test` and `package` once, before the commit.
