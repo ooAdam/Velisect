@@ -1,0 +1,25 @@
+# Unreal: build products and caches
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+*.sln
+*.vsconfig
+# the packaged game (npm run package builds it; play it with Play Velisect.bat)
+Packaged/
+Build/Windows/FileOpenOrder/
+
+# Content: only the game's own folder is source (imported and tuned assets, via LFS)
+Content/*
+!Content/Velisect/
+
+# SourceArt: Blender's exports, regenerated from the raw library by tools/pipeline/export_chars.py;
+# only the generated kit/textures and the synthesized audio are kept
+SourceArt/*
+!SourceArt/Backrooms/
+!SourceArt/Audio/
+
+node_modules/
+__pycache__/
+*.blend1
