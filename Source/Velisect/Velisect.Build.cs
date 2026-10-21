@@ -8,7 +8,7 @@ public class Velisect : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
-			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
+			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "AnimationCore",
 			"AIModule", "NavigationSystem", "GameplayTasks"
 		});
 

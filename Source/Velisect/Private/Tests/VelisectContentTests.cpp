@@ -95,11 +95,16 @@ bool FVelisectBonesTest::RunTest(const FString& Parameters)
 	{
 		const TCHAR* Path;
 		TArray<const TCHAR*> Bones;
+		bool bShootable = true;
 	};
+	const TCHAR* PlayerPath = TEXT("/Game/Velisect/Characters/Player/SK_Player.SK_Player");
 	const FRig Rigs[] = {
-		{TEXT("/Game/Velisect/Characters/Player/SK_Player.SK_Player"), {TEXT("Spine"), TEXT("Spine1"), TEXT("Spine2"), TEXT("Head"), TEXT("RightHand")}},
+		{PlayerPath, {TEXT("Spine"), TEXT("Spine1"), TEXT("Spine2"), TEXT("Head"), TEXT("RightHand"), TEXT("LeftArm"), TEXT("LeftForeArm"), TEXT("LeftHand"), TEXT("LeftHandMiddle1")}},
+		// First-person arms: the left-hand IK chain and the rifle's hand; never shot, so no physics asset.
+		{TEXT("/Game/Velisect/Characters/Player/SK_PlayerArms.SK_PlayerArms"), {TEXT("Spine"), TEXT("RightHand"), TEXT("LeftArm"), TEXT("LeftForeArm"), TEXT("LeftHand"), TEXT("LeftHandMiddle1")}, false},
 		{TEXT("/Game/Velisect/Characters/Zombie/SK_Zombie.SK_Zombie"), {TEXT("Spine"), TEXT("Head")}},
 	};
+	const USkeletalMesh* Player = LoadObject<USkeletalMesh>(nullptr, PlayerPath);
 	for (const FRig& Rig : Rigs)
 	{
 		USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, Rig.Path);
@@ -107,7 +112,14 @@ bool FVelisectBonesTest::RunTest(const FString& Parameters)
 		{
 			continue;
 		}
-		TestNotNull(FString::Printf(TEXT("%s has a physics asset (shots trace its bodies)"), Rig.Path), Mesh->GetPhysicsAsset());
+		if (Rig.bShootable)
+		{
+			TestNotNull(FString::Printf(TEXT("%s has a physics asset (shots trace its bodies)"), Rig.Path), Mesh->GetPhysicsAsset());
+		}
+		else
+		{
+			TestTrue(FString::Printf(TEXT("%s shares the player skeleton (plays the player clips)"), Rig.Path), Player && Mesh->GetSkeleton() == Player->GetSkeleton());
+		}
 		USkeletalMeshComponent* Component = NewObject<USkeletalMeshComponent>();
 		Component->SetSkeletalMeshAsset(Mesh);
 		for (const TCHAR* Bone : Rig.Bones)

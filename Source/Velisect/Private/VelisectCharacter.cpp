@@ -73,22 +73,40 @@ AVelisectCharacter::AVelisectCharacter()
 	Movement->SetCrouchedHalfHeight(58.f);
 	CrouchedEyeHeight = 50.f;
 
-	// Mixamo meshes face +Y; turn them to face the actor's +X.
+	// Mixamo meshes face +Y; turn them to face the actor's +X. The owner sees the arms instead; the body casts the shadow.
 	GetMesh()->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -92.f), FRotator(0.f, -90.f, 0.f));
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	GetMesh()->SetAnimInstanceClass(UVelisectAnimInstance::StaticClass());
+	GetMesh()->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::WorldSpaceRepresentation);
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(GetCapsuleComponent());
 	Camera->SetRelativeLocation(FVector(14.f, 0.f, EyeHeight));
 	Camera->bUsePawnControlRotation = true;
 	Camera->SetFieldOfView(90.f);
+	Camera->SetEnableFirstPersonFieldOfView(true);
+	Camera->SetEnableFirstPersonScale(true);
+
+	FirstPersonArms = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonArms"));
+	FirstPersonArms->SetupAttachment(Camera);
+	FirstPersonArms->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FirstPersonArms->SetCastShadow(false);
+	FirstPersonArms->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	FirstPersonArms->SetAnimInstanceClass(UVelisectAnimInstance::StaticClass());
+	FirstPersonArms->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
 
 	Weapon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Weapon"));
-	Weapon->SetupAttachment(GetMesh());
+	Weapon->SetupAttachment(FirstPersonArms);
 	Weapon->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Weapon->SetCastShadow(true);
+	Weapon->SetCastShadow(false);
+	Weapon->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
+
+	WorldWeapon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorldWeapon"));
+	WorldWeapon->SetupAttachment(GetMesh());
+	WorldWeapon->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WorldWeapon->SetCastShadow(true);
+	WorldWeapon->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::WorldSpaceRepresentation);
 
 	MuzzleLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("MuzzleLight"));
 	MuzzleLight->SetupAttachment(Weapon);
@@ -108,6 +126,7 @@ AVelisectCharacter::AVelisectCharacter()
 	Flashlight->SetVisibility(false);
 
 	BodyMeshAsset = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(TEXT("/Game/Velisect/Characters/Player/SK_Player.SK_Player")));
+	ArmsMeshAsset = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(TEXT("/Game/Velisect/Characters/Player/SK_PlayerArms.SK_PlayerArms")));
 	WeaponMeshAsset = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/Velisect/Weapons/Rifle/SM_Rifle.SM_Rifle")));
 	FireSound = TSoftObjectPtr<USoundBase>(FSoftObjectPath(TEXT("/Game/Velisect/Audio/S_RifleShot.S_RifleShot")));
 	ImpactDecalMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Velisect/Materials/M_BulletHole.M_BulletHole")));
@@ -163,18 +182,64 @@ void AVelisectCharacter::BeginPlay()
 	CameraBaseHeight = EyeHeight;
 	CameraBaseForward = CameraOffset.X;
 
+	Camera->SetFirstPersonFieldOfView(ViewmodelFieldOfView);
+	Camera->SetFirstPersonScale(ViewmodelScale);
+
 	if (UVelisectAnimInstance* Anim = GetVelisectAnim())
 	{
-		Anim->UpperBodyRootBone = Velisect::FindBone(GetMesh(), TEXT("Spine"));
+		SetupAnim(Anim, GetMesh());
 		Anim->AimBones = {Velisect::FindBone(GetMesh(), TEXT("Spine")), Velisect::FindBone(GetMesh(), TEXT("Spine1")), Velisect::FindBone(GetMesh(), TEXT("Spine2"))};
 		Anim->Play(EVelisectAnimLayer::Base, Loaded(IdleAnim), 0.f, true, 0.f);
-		Anim->SetUpperBodyAlpha(1.f, 0.f);
-
-		bEquipping = true;
-		UpperPose = EUpperPose::OneShot;
-		const float EquipTime = Anim->Play(EVelisectAnimLayer::Upper, Loaded(EquipAnim), 1.4f, false, 0.f);
-		GetWorldTimerManager().SetTimer(EquipTimer, this, &AVelisectCharacter::FinishEquip, FMath::Max(EquipTime * 0.85f, 0.1f));
 	}
+	// The arms stand in the aim pose (it is what ViewmodelOffset frames); the upper-body clips play over it.
+	if (UVelisectAnimInstance* Arms = GetArmsAnim())
+	{
+		SetupAnim(Arms, FirstPersonArms);
+		Arms->Play(EVelisectAnimLayer::Base, Loaded(AimPoseAnim), 0.f, true, 0.f);
+	}
+
+	bEquipping = true;
+	UpperPose = EUpperPose::OneShot;
+	const float EquipTime = PlayUpper(Loaded(EquipAnim), 1.4f, false, 0.f, false);
+	GetWorldTimerManager().SetTimer(EquipTimer, this, &AVelisectCharacter::FinishEquip, FMath::Max(EquipTime * 0.85f, 0.1f));
+}
+
+void AVelisectCharacter::SetupAnim(UVelisectAnimInstance* Anim, const USkeletalMeshComponent* Skeleton) const
+{
+	Anim->UpperBodyRootBone = Velisect::FindBone(Skeleton, TEXT("Spine"));
+	Anim->SetUpperBodyAlpha(1.f, 0.f);
+	Anim->LeftHand.RightHand = Velisect::FindBone(Skeleton, TEXT("RightHand"));
+	Anim->LeftHand.UpperArm = Velisect::FindBone(Skeleton, TEXT("LeftArm"));
+	Anim->LeftHand.ForeArm = Velisect::FindBone(Skeleton, TEXT("LeftForeArm"));
+	Anim->LeftHand.Hand = Velisect::FindBone(Skeleton, TEXT("LeftHand"));
+	Anim->LeftHand.Fingers.Reset();
+	for (const TCHAR* Finger : {TEXT("Thumb"), TEXT("Index"), TEXT("Middle"), TEXT("Ring"), TEXT("Pinky")})
+	{
+		for (int32 Joint = 1; Joint <= 3; ++Joint)
+		{
+			const FName Left = Velisect::FindBone(Skeleton, *FString::Printf(TEXT("LeftHand%s%d"), Finger, Joint));
+			const FName Right = Velisect::FindBone(Skeleton, *FString::Printf(TEXT("RightHand%s%d"), Finger, Joint));
+			if (!Left.IsNone() && !Right.IsNone())
+			{
+				Anim->LeftHand.Fingers.Emplace(Left, Right);
+			}
+		}
+	}
+	Anim->LeftHand.WeaponGrip = WeaponGripOffset;
+	Anim->LeftHand.Grip = LeftHandGrip;
+	Anim->LeftHand.GripPivot = PistolGrip;
+	Anim->LeftHand.Twist = LeftHandTwist.Quaternion();
+	Anim->LeftHand.ElbowHint = LeftElbowHint;
+}
+
+float AVelisectCharacter::PlayUpper(UAnimSequenceBase* Clip, float Rate, bool bLoop, float BlendTime, bool bRestart, UAnimSequenceBase* ArmsClip)
+{
+	if (UVelisectAnimInstance* Arms = GetArmsAnim())
+	{
+		Arms->Play(EVelisectAnimLayer::Upper, ArmsClip ? ArmsClip : Clip, Rate, bLoop, BlendTime, bRestart);
+	}
+	UVelisectAnimInstance* Anim = GetVelisectAnim();
+	return Anim ? Anim->Play(EVelisectAnimLayer::Upper, Clip, Rate, bLoop, BlendTime, bRestart) : 0.f;
 }
 
 void AVelisectCharacter::LoadAssets()
@@ -184,16 +249,25 @@ void AVelisectCharacter::LoadAssets()
 		GetMesh()->SetSkeletalMesh(Body);
 		GetMesh()->SetAnimInstanceClass(UVelisectAnimInstance::StaticClass());
 	}
+	if (USkeletalMesh* Arms = ArmsMeshAsset.LoadSynchronous(); Arms && FirstPersonArms->GetSkeletalMeshAsset() != Arms)
+	{
+		FirstPersonArms->SetSkeletalMesh(Arms);
+		FirstPersonArms->SetAnimInstanceClass(UVelisectAnimInstance::StaticClass());
+	}
+	FirstPersonArms->SetRelativeTransform(ViewmodelOffset);
 	if (UStaticMesh* Rifle = WeaponMeshAsset.LoadSynchronous())
 	{
 		Weapon->SetStaticMesh(Rifle);
+		WorldWeapon->SetStaticMesh(Rifle);
 	}
 
 	RightHandBone = Velisect::FindBone(GetMesh(), TEXT("RightHand"));
 	if (!RightHandBone.IsNone())
 	{
-		Weapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, RightHandBone);
+		Weapon->AttachToComponent(FirstPersonArms, FAttachmentTransformRules::KeepRelativeTransform, RightHandBone);
 		Weapon->SetRelativeTransform(WeaponGripOffset);
+		WorldWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, RightHandBone);
+		WorldWeapon->SetRelativeTransform(WeaponGripOffset);
 	}
 	MuzzleLight->SetRelativeLocation(MuzzleOffset);
 
@@ -208,6 +282,11 @@ void AVelisectCharacter::LoadAssets()
 UVelisectAnimInstance* AVelisectCharacter::GetVelisectAnim() const
 {
 	return Cast<UVelisectAnimInstance>(GetMesh()->GetAnimInstance());
+}
+
+UVelisectAnimInstance* AVelisectCharacter::GetArmsAnim() const
+{
+	return Cast<UVelisectAnimInstance>(FirstPersonArms->GetAnimInstance());
 }
 
 UAnimSequenceBase* AVelisectCharacter::Loaded(const TSoftObjectPtr<UAnimSequenceBase>& Anim)
@@ -320,6 +399,10 @@ void AVelisectCharacter::Look(const FInputActionValue& Value)
 	Rotation.Yaw += Delta.X * Sensitivity;
 	Rotation.Pitch = FMath::Clamp(FRotator::NormalizeAxis(Rotation.Pitch + Delta.Y * Sensitivity), -80.f, 80.f);
 	Controller->SetControlRotation(Rotation);
+
+	// The rifle lags behind the turn, then settles (UpdateViewmodel).
+	ViewSway.X = FMath::Clamp(ViewSway.X - Delta.X * Sensitivity * ViewmodelSway, -ViewmodelMaxSway, ViewmodelMaxSway);
+	ViewSway.Y = FMath::Clamp(ViewSway.Y - Delta.Y * Sensitivity * ViewmodelSway, -ViewmodelMaxSway, ViewmodelMaxSway);
 }
 
 bool AVelisectCharacter::IsSprinting() const
@@ -435,12 +518,15 @@ void AVelisectCharacter::Reload()
 	bReloading = true;
 	UpperPose = EUpperPose::OneShot;
 	StopFire();
-	float Duration = 2.f;
-	if (UVelisectAnimInstance* Anim = GetVelisectAnim())
-	{
-		Duration = Anim->Play(EVelisectAnimLayer::Upper, Loaded(ReloadAnim), ReloadPlayRate, false, 0.2f, true);
-	}
+	const float Duration = PlayUpper(Loaded(ReloadAnim), ReloadPlayRate, false, 0.2f, true);
 	GetWorldTimerManager().SetTimer(ReloadTimer, this, &AVelisectCharacter::FinishReload, FMath::Max(Duration - 0.2f, 0.5f));
+}
+
+void AVelisectCharacter::VsReload()
+{
+	// A full magazine never reloads; spend a round first.
+	AmmoInMagazine = FMath::Min(AmmoInMagazine, MagazineSize - 1);
+	Reload();
 }
 
 void AVelisectCharacter::FinishReload()
@@ -489,10 +575,7 @@ float AVelisectCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Dam
 	{
 		HitReactUntil = GetWorld()->GetTimeSeconds() + 0.35f;
 		UpperPose = EUpperPose::OneShot;
-		if (UVelisectAnimInstance* Anim = GetVelisectAnim())
-		{
-			Anim->Play(EVelisectAnimLayer::Upper, Loaded(HitReactAnim), 1.6f, false, 0.08f, true);
-		}
+		PlayUpper(Loaded(HitReactAnim), 1.6f, false, 0.08f, true);
 	}
 	return DamageAmount;
 }
@@ -509,8 +592,14 @@ void AVelisectCharacter::Die()
 	{
 		Anim->AimRotation = FQuat::Identity;
 		Anim->SetUpperBodyAlpha(0.f, 0.2f);
+		Anim->SetLeftHandAlpha(0.f, 0.2f);
 		Anim->Play(EVelisectAnimLayer::Base, Loaded(DeathAnim), 1.f, false, 0.2f, true);
 	}
+
+	// The death cam sees the body and its rifle, not the first-person arms.
+	FirstPersonArms->SetVisibility(false, true);
+	GetMesh()->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::None);
+	WorldWeapon->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::None);
 
 	// Ride the head down with the body.
 	if (!HeadBone.IsNone())
@@ -595,6 +684,14 @@ void AVelisectCharacter::UpdateAnimation(float DeltaSeconds)
 		Anim->Play(EVelisectAnimLayer::Base, Loaded(IdleAnim), 0.f, true, 0.3f);
 	}
 
+	// The left hand holds the rifle except while reload and equip use it.
+	const float LeftHand = bReloading || bEquipping ? 0.f : 1.f;
+	Anim->SetLeftHandAlpha(LeftHand);
+	if (UVelisectAnimInstance* Arms = GetArmsAnim())
+	{
+		Arms->SetLeftHandAlpha(LeftHand);
+	}
+
 	// Upper layer: weapon handling. One-shot clips (reload, equip, hit) own the layer until they finish.
 	const bool bHitReacting = GetWorld()->GetTimeSeconds() < HitReactUntil;
 	if (bReloading || bEquipping || bHitReacting)
@@ -603,12 +700,13 @@ void AVelisectCharacter::UpdateAnimation(float DeltaSeconds)
 	}
 
 	// Pose clips restart on change, so the aim pose can share the fire clip frozen on its first frame.
-	auto SetUpperPose = [this, Anim](EUpperPose Pose, const TSoftObjectPtr<UAnimSequenceBase>& Clip, float Rate, float BlendTime)
+	auto SetUpperPose = [this](EUpperPose Pose, const TSoftObjectPtr<UAnimSequenceBase>& Clip, float Rate, float BlendTime)
 	{
 		if (UpperPose != Pose)
 		{
 			UpperPose = Pose;
-			Anim->Play(EVelisectAnimLayer::Upper, Loaded(Clip), Rate, true, BlendTime, true);
+			// The low-ready clip takes the rifle out of view: the arms keep aiming and UpdateViewmodel lowers them.
+			PlayUpper(Loaded(Clip), Rate, true, BlendTime, true, Pose == EUpperPose::LowReady ? Loaded(AimPoseAnim) : nullptr);
 		}
 	};
 
@@ -681,4 +779,19 @@ void AVelisectCharacter::UpdateCamera(float DeltaSeconds)
 	Location.X = CameraBaseForward;
 	Location.Y = CameraOffset.Y + FMath::Sin(BobPhase) * Amplitude * 0.4f;
 	Camera->SetRelativeLocation(Location);
+
+	ViewSway = FMath::Vector2DInterpTo(ViewSway, FVector2D::ZeroVector, DeltaSeconds, 8.f);
+	UpdateViewmodel(DeltaSeconds, Amplitude);
+}
+
+void AVelisectCharacter::UpdateViewmodel(float DeltaSeconds, float BobAmplitude)
+{
+	// Kick, sway and the sprint hold turn the rifle about the right hand (camera space); kick also slides it back, and
+	// it bobs a little against the camera's own bob.
+	SprintBlend = FMath::FInterpTo(SprintBlend, IsSprinting() && !bReloading ? 1.f : 0.f, DeltaSeconds, 9.f);
+	const FVector Pivot = ViewmodelOffset.TransformPosition(FirstPersonArms->GetSocketTransform(RightHandBone, RTS_Component).GetLocation());
+	const FRotator Turn = FRotator(ViewSway.Y + WeaponKick * 0.6f, ViewSway.X, ViewSway.X * 0.5f) + ViewmodelSprintTurn * SprintBlend;
+	const FVector Slide = FVector(-WeaponKick * ViewmodelKickBack, FMath::Sin(BobPhase) * BobAmplitude * 0.3f, FMath::Sin(BobPhase * 2.f) * BobAmplitude * 0.2f) + ViewmodelSprintSlide * SprintBlend;
+	const FTransform Motion = FTransform(-Pivot) * FTransform(Turn) * FTransform(Pivot + Slide);
+	FirstPersonArms->SetRelativeTransform(ViewmodelOffset * Motion);
 }

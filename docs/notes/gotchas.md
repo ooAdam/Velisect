@@ -24,4 +24,6 @@ One trap per bullet, under its topic. `Grep "^## " gotchas.md` for the map.
 - Mixamo takes carry forward travel on the hips (Sprint 3.6 m per cycle); export them in place from Blender.
 - The upper-body layer must blend its root in component space, and the spine's aim pitch is inverted on this rig (see `animation.md`).
 - Vicevoxel crates import at wildly different scales (a 3 m crate): `ue_level.py`'s props are scaled to target heights after placing.
+- Python: elements of a struct-array property (`SkeletalMesh.materials`) are copies; set the element, put it back by index, then set the array.
+- First-person scale lights the viewmodel where it is drawn (nearer the eye, outside the body's shadow): under a ceiling panel the rifle reads silver, by a wall gunmetal. FP self-shadow (`[SystemSettings]` in DefaultEngine.ini) helps a little.
 - With every panel lit and shadowed, VSM one-pass projection overflows: rect lights on a checkerboard, shadows on half of those (36).

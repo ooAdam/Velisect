@@ -16,7 +16,10 @@ class USoundBase;
 class UVelisectAnimInstance;
 struct FInputActionValue;
 
-/** True first-person player: full Mixamo body under the camera (head hidden) holding the rifle. */
+/**
+ * First-person player. The view shows arms and a rifle on the camera (first-person primitives with their own FOV and
+ * scale, so they never clip into walls); the full Mixamo body is the world representation (shadow, death cam).
+ */
 UCLASS()
 class VELISECT_API AVelisectCharacter : public ACharacter
 {
@@ -41,6 +44,10 @@ public:
 	/** Seconds since the player last took damage (for the HUD damage flash). */
 	float GetTimeSinceDamaged() const;
 
+	/** Console: start a reload (for checking the reload on screen without input). */
+	UFUNCTION(Exec)
+	void VsReload();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -50,8 +57,17 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
 	TObjectPtr<UCameraComponent> Camera;
 
+	/** Arms-only cut of the body, posed by the same upper-body clips, framed on the camera. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
+	TObjectPtr<USkeletalMeshComponent> FirstPersonArms;
+
+	/** The rifle the player sees, in the first-person arms' right hand. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
 	TObjectPtr<UStaticMeshComponent> Weapon;
+
+	/** The body's rifle: its shadow, and what the death cam sees. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
+	TObjectPtr<UStaticMeshComponent> WorldWeapon;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
 	TObjectPtr<USpotLightComponent> Flashlight;
@@ -65,11 +81,18 @@ protected:
 	TSoftObjectPtr<USkeletalMesh> BodyMeshAsset;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
+	TSoftObjectPtr<USkeletalMesh> ArmsMeshAsset;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
 	TSoftObjectPtr<UStaticMesh> WeaponMeshAsset;
 
 	/** Rifle placement relative to the right hand bone. */
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
 	FTransform WeaponGripOffset;
+
+	/** Centre of the pistol grip in weapon mesh space (where the right palm sits). */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
+	FVector PistolGrip = FVector(0.f, 17.8f, 10.3f);
 
 	/** Muzzle position in weapon mesh space. */
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
@@ -144,6 +167,48 @@ protected:
 	/** Camera offset from the capsule centre (X forward, Y right); height comes from EyeHeight. */
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Camera")
 	FVector2D CameraOffset = FVector2D(14.f, 0.f);
+
+	/** First-person arms relative to the camera (X forward, Y right, Z up); frames the rifle in the aim pose. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FTransform ViewmodelOffset;
+
+	/** Horizontal field of view the arms and rifle are drawn with. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	float ViewmodelFieldOfView = 70.f;
+
+	/** Arms and rifle shrink towards the camera by this much so they never poke into walls (looks the same on screen). */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	float ViewmodelScale = 0.6f;
+
+	/** Where the left hand holds the rifle (rifle mesh space): it holds it the way the right hand holds PistolGrip, mirrored. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FVector LeftHandGrip = FVector::ZeroVector;
+
+	/** Turns the left hand's hold about LeftHandGrip (rifle space), e.g. upright for a vertical foregrip. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FRotator LeftHandTwist = FRotator::ZeroRotator;
+
+	/** Where the left elbow swings, as a nudge from the clip's elbow (arms mesh space: X left, Y forward, Z up). */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FVector LeftElbowHint = FVector::ZeroVector;
+
+	/** While sprinting the arms keep the aim pose and the rifle drops and tilts by this (camera space, about the right hand). */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FVector ViewmodelSprintSlide = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FRotator ViewmodelSprintTurn = FRotator::ZeroRotator;
+
+	/** Centimetres the rifle slides back per degree of WeaponKick. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	float ViewmodelKickBack = 1.f;
+
+	/** Degrees the rifle trails the view per degree turned, and the most it trails. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	float ViewmodelSway = 0.35f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	float ViewmodelMaxSway = 2.5f;
 
 	// ---- Movement ----
 
@@ -220,7 +285,12 @@ private:
 	void BuildInput();
 	void UpdateAnimation(float DeltaSeconds);
 	void UpdateCamera(float DeltaSeconds);
+	void UpdateViewmodel(float DeltaSeconds, float BobAmplitude);
+	void SetupAnim(UVelisectAnimInstance* Anim, const USkeletalMeshComponent* Skeleton) const;
+	/** Plays a clip on the upper body of the body and the first-person arms (ArmsClip instead, if given); returns its duration. */
+	float PlayUpper(UAnimSequenceBase* Clip, float Rate, bool bLoop, float BlendTime, bool bRestart, UAnimSequenceBase* ArmsClip = nullptr);
 	UVelisectAnimInstance* GetVelisectAnim() const;
+	UVelisectAnimInstance* GetArmsAnim() const;
 	UAnimSequenceBase* Loaded(const TSoftObjectPtr<UAnimSequenceBase>& Anim);
 
 	void Move(const FInputActionValue& Value);
@@ -280,6 +350,10 @@ private:
 	float BobPhase = 0.f;
 	float RecoilKick = 0.f;
 	float WeaponKick = 0.f;
+	/** Degrees the viewmodel trails the view: X yaw, Y pitch. */
+	FVector2D ViewSway = FVector2D::ZeroVector;
+	/** 0..1 towards the sprint hold of the viewmodel. */
+	float SprintBlend = 0.f;
 	FName RightHandBone;
 	FName HeadBone;
 	FTimerHandle FireTimer;

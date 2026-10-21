@@ -32,6 +32,29 @@ struct FVelisectAnimLayer
 	TArray<FVelisectAnimChannel> Channels;
 };
 
+/**
+ * Puts the left hand on the weapon carried by the right hand, whatever the clip does with the arms: it holds Grip the
+ * way the right hand holds GripPivot (the pistol grip), mirrored across the weapon's centre plane, fingers included.
+ */
+struct FVelisectLeftHandIK
+{
+	FName RightHand;
+	FName UpperArm;
+	FName ForeArm;
+	FName Hand;
+	/** (left, right) finger bones; each left finger takes its right twin's rotation, mirrored. */
+	TArray<TPair<FName, FName>> Fingers;
+	/** Weapon relative to the right hand bone. */
+	FTransform WeaponGrip;
+	/** Where the left hand holds and where the right hand holds, in weapon mesh space. */
+	FVector Grip = FVector::ZeroVector;
+	FVector GripPivot = FVector::ZeroVector;
+	/** Turns the mirrored hold about Grip (weapon space), e.g. to stand a raked grip's hold upright. */
+	FQuat Twist = FQuat::Identity;
+	/** Component-space nudge from the clip's elbow towards where the elbow should swing (the IK pole). */
+	FVector ElbowHint = FVector::ZeroVector;
+};
+
 /** Thread-safe copy of a channel handed to the proxy for evaluation. */
 struct FVelisectPoseSample
 {
@@ -53,6 +76,7 @@ private:
 	static void BlendSamples(const TArray<FVelisectPoseSample>& Samples, FPoseContext& Output);
 	void ApplyUpperBody(FPoseContext& Output) const;
 	void ApplyAimRotation(FPoseContext& Output) const;
+	void ApplyLeftHandIK(FPoseContext& Output) const;
 
 	TArray<FVelisectPoseSample> BaseSamples;
 	TArray<FVelisectPoseSample> UpperSamples;
@@ -60,6 +84,8 @@ private:
 	FName UpperBodyRootBone;
 	TArray<FName> AimBones;
 	FQuat AimRotation = FQuat::Identity;
+	FVelisectLeftHandIK LeftHand;
+	float LeftHandAlpha = 0.f;
 };
 
 /**
@@ -85,6 +111,9 @@ public:
 
 	void SetUpperBodyAlpha(float Alpha, float BlendTime = 0.2f);
 
+	/** Blend the left hand onto the weapon (1) or back to the clip (0). */
+	void SetLeftHandAlpha(float Alpha, float BlendTime = 0.15f);
+
 	/** Bone whose subtree the Upper layer drives. Its rotation blends in component space, so the upper body keeps
 	 *  the clip's facing even when the base layer's hips are turned differently. */
 	FName UpperBodyRootBone;
@@ -94,6 +123,8 @@ public:
 
 	/** Component-space rotation spread across AimBones (aim pitch plus any yaw trim). */
 	FQuat AimRotation = FQuat::Identity;
+
+	FVelisectLeftHandIK LeftHand;
 
 protected:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
@@ -107,4 +138,7 @@ private:
 	float UpperAlpha = 0.f;
 	float UpperTargetAlpha = 0.f;
 	float UpperAlphaSpeed = 5.f;
+	float LeftHandAlpha = 0.f;
+	float LeftHandTargetAlpha = 0.f;
+	float LeftHandAlphaSpeed = 5.f;
 };

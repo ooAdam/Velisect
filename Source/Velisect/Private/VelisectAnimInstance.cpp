@@ -4,9 +4,16 @@
 #include "Animation/AnimationPoseData.h"
 #include "Animation/AnimNodeBase.h"
 #include "BonePose.h"
+#include "TwoBoneIK.h"
 
 namespace
 {
+	FCompactPoseBoneIndex CompactIndex(const FBoneContainer& Bones, FName Name)
+	{
+		const int32 MeshIndex = Name.IsNone() ? INDEX_NONE : Bones.GetPoseBoneIndexForBoneName(Name);
+		return MeshIndex == INDEX_NONE ? FCompactPoseBoneIndex(INDEX_NONE) : Bones.MakeCompactPoseIndex(FMeshPoseBoneIndex(MeshIndex));
+	}
+
 	float BlendSpeedFor(float BlendTime)
 	{
 		return BlendTime > KINDA_SMALL_NUMBER ? 1.f / BlendTime : 1000.f;
@@ -95,6 +102,12 @@ void UVelisectAnimInstance::SetUpperBodyAlpha(float Alpha, float BlendTime)
 	UpperAlphaSpeed = BlendSpeedFor(BlendTime);
 }
 
+void UVelisectAnimInstance::SetLeftHandAlpha(float Alpha, float BlendTime)
+{
+	LeftHandTargetAlpha = FMath::Clamp(Alpha, 0.f, 1.f);
+	LeftHandAlphaSpeed = BlendSpeedFor(BlendTime);
+}
+
 void UVelisectAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
@@ -127,6 +140,7 @@ void UVelisectAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 
 	UpperAlpha = FMath::FInterpConstantTo(UpperAlpha, UpperTargetAlpha, DeltaSeconds, UpperAlphaSpeed);
+	LeftHandAlpha = FMath::FInterpConstantTo(LeftHandAlpha, LeftHandTargetAlpha, DeltaSeconds, LeftHandAlphaSpeed);
 }
 
 FAnimInstanceProxy* UVelisectAnimInstance::CreateAnimInstanceProxy()
@@ -150,6 +164,8 @@ void FVelisectAnimInstanceProxy::PreUpdate(UAnimInstance* InAnimInstance, float 
 	UpperBodyRootBone = Instance->UpperBodyRootBone;
 	AimBones = Instance->AimBones;
 	AimRotation = Instance->AimRotation;
+	LeftHand = Instance->LeftHand;
+	LeftHandAlpha = Instance->LeftHandAlpha;
 }
 
 bool FVelisectAnimInstanceProxy::Evaluate(FPoseContext& Output)
@@ -165,6 +181,7 @@ bool FVelisectAnimInstanceProxy::Evaluate(FPoseContext& Output)
 
 	ApplyUpperBody(Output);
 	ApplyAimRotation(Output);
+	ApplyLeftHandIK(Output);
 	return true;
 }
 
@@ -274,4 +291,60 @@ void FVelisectAnimInstanceProxy::ApplyAimRotation(FPoseContext& Output) const
 		FTransform& Local = Output.Pose[BoneIndex];
 		Local.SetRotation((ParentRotation.Inverse() * Slice * ParentRotation * Local.GetRotation()).GetNormalized());
 	}
+}
+
+void FVelisectAnimInstanceProxy::ApplyLeftHandIK(FPoseContext& Output) const
+{
+	if (LeftHandAlpha <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const FBoneContainer& Bones = Output.Pose.GetBoneContainer();
+	const FCompactPoseBoneIndex RightHand = CompactIndex(Bones, LeftHand.RightHand);
+	const FCompactPoseBoneIndex UpperArm = CompactIndex(Bones, LeftHand.UpperArm);
+	const FCompactPoseBoneIndex ForeArm = CompactIndex(Bones, LeftHand.ForeArm);
+	const FCompactPoseBoneIndex Hand = CompactIndex(Bones, LeftHand.Hand);
+	if (!RightHand.IsValid() || !UpperArm.IsValid() || !ForeArm.IsValid() || !Hand.IsValid())
+	{
+		return;
+	}
+
+	// The rig's left bones mirror the right ones across component X (the body's left-right axis), so a mirrored
+	// rotation is the same quaternion with Y and Z negated; that holds for local rotations and for weapon space alike.
+	auto Mirror = [](const FQuat& Rotation) { return FQuat(Rotation.X, -Rotation.Y, -Rotation.Z, Rotation.W); };
+
+	// Fingers (local space): the left hand closes the way the right one closes on the pistol grip.
+	for (const TPair<FName, FName>& Finger : LeftHand.Fingers)
+	{
+		const FCompactPoseBoneIndex Left = CompactIndex(Bones, Finger.Key);
+		const FCompactPoseBoneIndex Right = CompactIndex(Bones, Finger.Value);
+		if (Left.IsValid() && Right.IsValid())
+		{
+			FTransform& Local = Output.Pose[Left];
+			Local.SetRotation(FQuat::Slerp(Local.GetRotation(), Mirror(Output.Pose[Right].GetRotation()), LeftHandAlpha).GetNormalized());
+		}
+	}
+
+	// The hand: the right hand's hold (weapon space) mirrored across the weapon's centre plane, carried from the
+	// pistol grip to Grip and turned about it.
+	const FTransform RightInWeapon = LeftHand.WeaponGrip.Inverse();
+	const FVector MirroredLocation(-RightInWeapon.GetLocation().X, RightInWeapon.GetLocation().Y, RightInWeapon.GetLocation().Z);
+	const FVector HandInWeapon = LeftHand.Grip + LeftHand.Twist.RotateVector(MirroredLocation - LeftHand.GripPivot);
+	const FQuat HandInWeaponRotation = LeftHand.Twist * Mirror(RightInWeapon.GetRotation());
+
+	FCSPose<FCompactPose> ComponentPose;
+	ComponentPose.InitPose(Output.Pose);
+	const FTransform Weapon = LeftHand.WeaponGrip * ComponentPose.GetComponentSpaceTransform(RightHand);
+	FTransform UpperTransform = ComponentPose.GetComponentSpaceTransform(UpperArm);
+	FTransform ForeTransform = ComponentPose.GetComponentSpaceTransform(ForeArm);
+	FTransform HandTransform = ComponentPose.GetComponentSpaceTransform(Hand);
+
+	// The clip's elbow, nudged by the hint, sets the arm's bend plane.
+	AnimationCore::SolveTwoBoneIK(UpperTransform, ForeTransform, HandTransform, ForeTransform.GetLocation() + LeftHand.ElbowHint, Weapon.TransformPosition(HandInWeapon), false, 1.0, 1.0);
+	HandTransform.SetRotation((Weapon.GetRotation() * HandInWeaponRotation).GetNormalized());
+
+	const FBoneTransform Solved[] = {{UpperArm, UpperTransform}, {ForeArm, ForeTransform}, {Hand, HandTransform}};
+	ComponentPose.LocalBlendCSBoneTransforms(Solved, LeftHandAlpha);
+	FCSPose<FCompactPose>::ConvertComponentPosesToLocalPoses(MoveTemp(ComponentPose), Output.Pose);
 }

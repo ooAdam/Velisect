@@ -1,7 +1,11 @@
-"""Through the Velisect editor's MCP (port 8010): start PIE, let it settle, save the editor's image, stop PIE.
-Usage: python pie_shot.py <out.png> [seconds]"""
+"""Through the Velisect editor's MCP (port 8010): start PIE, let it settle, level the view and save a 1920x1080 frame of
+the game (HighResShot; the editor's image if that fails), stop PIE.
+Usage: python pie_shot.py <out.png> [seconds]   (VS_SHOT_CMDS="cmd1;cmd2" runs console commands in PIE first)"""
 import base64
+import glob
 import json
+import shutil
+import subprocess
 import sys
 import time
 import os
@@ -25,7 +29,29 @@ if not already:
     call("StartPIE", {"options": {"bSimulate": False, "playMode": "PlayMode_InViewPort", "warmupSeconds": settle}})
 else:
     time.sleep(settle)
-for item in call("CaptureEditorImage").get("result", {}).get("content", []):
+# The game frame: through the editor's Python, level the player's view and ask for a high-res shot of it.
+here = os.path.dirname(os.path.abspath(__file__))
+shots = os.path.join(here, "..", "..", "Saved", "Screenshots")
+before = set(glob.glob(os.path.join(shots, "**", "*.png"), recursive=True))
+command = os.path.join(here, "..", "..", "Saved", "ToolLogs", "pie_shot_view.py")
+open(command, "w").write("""import unreal
+world = unreal.UnrealEditorSubsystem().get_game_world()
+pc = unreal.GameplayStatics.get_player_controller(world, 0)
+pc.set_control_rotation(unreal.Rotator(roll=0, pitch=0, yaw=pc.get_control_rotation().yaw))
+for cmd in %r:
+    unreal.SystemLibrary.execute_console_command(world, cmd)
+unreal.SystemLibrary.execute_console_command(world, "HighResShot 1920x1080")
+""" % [c for c in os.environ.get("VS_SHOT_CMDS", "").split(";") if c.strip()])
+subprocess.run([sys.executable, "-I", os.path.join(here, "uepy.py"), command], capture_output=True)
+for _ in range(20):
+    time.sleep(0.5)
+    new = set(glob.glob(os.path.join(shots, "**", "*.png"), recursive=True)) - before
+    if new:
+        time.sleep(0.5)
+        shutil.copyfile(max(new, key=os.path.getmtime), out)
+        print("shot:", out)
+        break
+for item in ([] if new else call("CaptureEditorImage").get("result", {}).get("content", [])):
     if item.get("type") == "text" and '"mimeType"' in item.get("text", ""):
         image = json.loads(item["text"]).get("returnValue") or {}
         open(out, "wb").write(base64.b64decode(image.get("image", image)["data"]))
