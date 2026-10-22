@@ -1,6 +1,8 @@
 """Writes player_cfg.json's tuning onto BP_Player's defaults (run in the open editor: node tools/unreal.mjs py tools/pipeline/ue_tune_player.py).
 The viewmodel is framed from the reference: "frame" pins rifle mesh points to screen spots (fractions of the half-width
-from the centre, right and down) at the viewmodel FOV; the rifle pose that lands them there gives the arms' offset."""
+from the centre, right and down) at the viewmodel FOV; the rifle pose that lands them there gives the arms' offset.
+The first-person takes (export_fp.py) hold the rifle at viewmodel.hold.rifle (arms space); the right hand of A_FP_Idle's
+first frame gives the rifle's grip offset."""
 import json, math
 import unreal
 
@@ -62,15 +64,18 @@ for point, (u, v) in vm["frame"]:
     print("frame point", point, "lands", round(c.y / c.x / tan_half, 3), round(-c.z / c.x / tan_half, 3), "wanted", u, v)
 print("rifle in camera (x, y, z, yaw, pitch):", [round(p, 2) for p in params], "error", round(error, 4))
 
-# The arms' aim pose (the rifle clip's first frame) puts the rifle at grip * right hand; place the arms so it lands there.
+# The takes hold the rifle at hold.rifle in arms space; place the arms so it lands on the framed spot, and hang the rifle
+# off the hold's right hand.
 arms = unreal.load_asset("/Game/Velisect/Characters/Player/SK_PlayerArms")
-aim = unreal.load_asset("/Game/Velisect/Characters/Player/Animations/A_Player_FiringRifle")
+held = unreal.load_asset("/Game/Velisect/Characters/Player/Animations/A_FP_Idle")
 options = unreal.AnimPoseEvaluationOptions()
 options.set_editor_property("optional_skeletal_mesh", arms)
-pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(aim, 0.0, options)
+pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(held, 0.0, options)
 right_hand = next(n for n in unreal.AnimPoseExtensions.get_bone_names(pose) if str(n).lower() == "righthand")
 hand = unreal.AnimPoseExtensions.get_bone_pose(pose, right_hand, unreal.AnimPoseSpaces.WORLD)
-rifle_in_arms = M.compose_transforms(grip_t, hand)
+h = vm["hold"]["rifle"]
+rifle_in_arms = unreal.Transform(unreal.Vector(*h["loc"]), unreal.Quat(*h["quat"]).rotator(), unreal.Vector(1, 1, 1))
+viewmodel_grip = M.compose_transforms(rifle_in_arms, M.invert_transform(hand))
 target = rifle_in_camera(*params)
 offset = M.compose_transforms(M.invert_transform(rifle_in_arms), target)
 check = M.compose_transforms(rifle_in_arms, offset)
@@ -85,6 +90,8 @@ cdo.set_editor_property("aim_yaw_offset", cfg["yaw"])
 cdo.set_editor_property("aim_pitch_scale", cfg["pitch_scale"])
 cdo.set_editor_property("aim_pitch_offset", cfg["pitch_offset"])
 cdo.set_editor_property("weapon_grip_offset", grip_t)
+cdo.set_editor_property("viewmodel_grip_offset", viewmodel_grip)
+cdo.set_editor_property("reload_play_rate", cfg["reload_rate"])
 cdo.set_editor_property("muzzle_offset", unreal.Vector(*cfg["muzzle"]))
 cdo.set_editor_property("viewmodel_offset", offset)
 cdo.set_editor_property("viewmodel_field_of_view", vm["fov"])

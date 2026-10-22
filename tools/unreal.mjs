@@ -5,7 +5,8 @@
 //   package   compile, cook and pack the game: Packaged/Windows/Velisect.exe
 //   play      start the packaged game, as Play Velisect.bat does
 //   open      open the editor with its MCP server on port 8010 (8000 belongs to the Mournhollow editor)
-//   py <file> run a Python file inside the open Velisect editor (remote execution; editor automation)
+//   py <file> run a Python file inside the open Velisect editor (remote execution; editor automation),
+//             or in a headless editor when none is open (no viewport or PIE; prints come back the same)
 //   blender <file>  run a Blender pipeline script in a fresh headless Blender (factory settings)
 //   shot [name]     in the open editor: start PIE, wait, save the editor's image to Saved/ToolLogs/shots/<name>.png, stop PIE
 //
@@ -113,10 +114,24 @@ const steps = {
     return run(gameExe, [], { cwd: gameDir, detached: true, stdio: 'ignore' });
   },
   open: () => run(editorExe, [uproject, '-ModelContextProtocolStartServer', '-ModelContextProtocolPort=8010'], { detached: true, stdio: 'ignore' }),
-  py: () => {
+  py: async () => {
     const file = argAfter('py');
     if (!file) { console.error('Usage: node tools/unreal.mjs py <file.py>'); return 2; }
-    return python('uepy.py', [resolve(project, file)]);
+    if (velisectEditorOpen()) return python('uepy.py', [resolve(project, file)]);
+    // No editor open: the python commandlet, with print() routed into the log so the script's output comes back
+    const wrapper = join(toolLogs, 'py_headless.py');
+    writeFileSync(wrapper, ['import sys, unreal', 'class Out:', '    buf = ""',
+      '    def write(self, s):', '        self.buf += s', '        *lines, self.buf = self.buf.split(chr(10))',
+      '        for line in lines: unreal.log_warning("VSPY " + line)', '    def flush(self): pass',
+      'sys.stdout = Out()', `target = ${JSON.stringify(resolve(project, file))}`,
+      'exec(compile(open(target).read(), target, "exec"), {"__name__": "__main__", "__file__": target})'].join('\n'));
+    await run(editorExe.replace(/UnrealEditor\.exe$/, 'UnrealEditor-Cmd.exe'), [uproject, '-run=pythonscript', `-script=${wrapper}`,
+      '-unattended', '-nullrhi', '-nosplash', '-nopause', '-NoSound', '-stdout']);
+    const lines = readFileSync(stepLog, 'utf8').split(/\r?\n/);
+    for (const l of lines) { const m = l.match(/\]LogPython: Warning: VSPY (.*)$/); if (m) console.log(m[1]); }  // not the summary's repeats
+    const errors = lines.filter((l) => /LogPython: Error|Traceback/.test(l));
+    if (errors.length) { console.error(errors.slice(0, 20).join('\n')); return 1; }
+    return 0;
   },
   blender: () => {
     const file = argAfter('blender');

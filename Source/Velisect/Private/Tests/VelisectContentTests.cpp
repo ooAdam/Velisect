@@ -127,6 +127,15 @@ bool FVelisectBonesTest::RunTest(const FString& Parameters)
 			TestFalse(FString::Printf(TEXT("%s finds %s"), Rig.Path, Bone), Velisect::FindBone(Component, Bone).IsNone());
 		}
 	}
+
+	// The first-person rifle's moving parts, which its A_RifleFP takes drive.
+	if (const USkeletalMesh* Rifle = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Velisect/Weapons/Rifle/SK_RifleFP.SK_RifleFP")); TestNotNull(TEXT("SK_RifleFP loads"), Rifle))
+	{
+		for (const TCHAR* Bone : {TEXT("magazine"), TEXT("magazine_spare"), TEXT("bolt"), TEXT("trigger")})
+		{
+			TestTrue(FString::Printf(TEXT("SK_RifleFP has %s"), Bone), Rifle->GetRefSkeleton().FindBoneIndex(Bone) != INDEX_NONE);
+		}
+	}
 	return true;
 }
 

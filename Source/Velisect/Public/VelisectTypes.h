@@ -19,6 +19,19 @@ struct FVelisectLocoClip
 	float NaturalSpeed = 300.f;
 };
 
+/** A first-person clip: the arms' take and the rifle's matching take (magazines, bolt), played together. */
+USTRUCT(BlueprintType)
+struct FVelisectViewmodelClip
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftObjectPtr<UAnimSequenceBase> Arms;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftObjectPtr<UAnimSequenceBase> Weapon;
+};
+
 namespace Velisect
 {
 	/** Mixamo bones import as "mixamorig:Name" or "mixamorig_Name"; find a bone by its unprefixed name. */

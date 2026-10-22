@@ -48,6 +48,10 @@ public:
 	UFUNCTION(Exec)
 	void VsReload();
 
+	/** Console: empty the magazine and reload (the empty reload racks the charging handle). */
+	UFUNCTION(Exec)
+	void VsReloadEmpty();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -57,13 +61,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
 	TObjectPtr<UCameraComponent> Camera;
 
-	/** Arms-only cut of the body, posed by the same upper-body clips, framed on the camera. */
+	/** Arms-only cut of the body, playing the first-person clips, framed on the camera. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
 	TObjectPtr<USkeletalMeshComponent> FirstPersonArms;
 
-	/** The rifle the player sees, in the first-person arms' right hand. */
+	/** The rifle the player sees, in the first-person arms' right hand; its own takes move the magazines and bolt. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
-	TObjectPtr<UStaticMeshComponent> Weapon;
+	TObjectPtr<USkeletalMeshComponent> Weapon;
 
 	/** The body's rifle: its shadow, and what the death cam sees. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Velisect")
@@ -86,9 +90,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
 	TSoftObjectPtr<UStaticMesh> WeaponMeshAsset;
 
-	/** Rifle placement relative to the right hand bone. */
+	/** The first-person rifle: SM_Rifle's mesh rigged with magazine, spare magazine, bolt and trigger bones. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
+	TSoftObjectPtr<USkeletalMesh> ViewmodelWeaponAsset;
+
+	/** The body's rifle relative to the body's right hand bone. */
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
 	FTransform WeaponGripOffset;
+
+	/** The first-person rifle relative to the arms' right hand bone (the authored hold). */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
+	FTransform ViewmodelGripOffset;
 
 	/** Centre of the pistol grip in weapon mesh space (where the right palm sits). */
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Assets")
@@ -119,8 +131,28 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Animation")
 	float WeaponKickPerShot = 2.f;
 
+	/** The body's reload (its shadow), stretched to the first-person reload's length. */
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Animation")
 	TSoftObjectPtr<UAnimSequenceBase> ReloadAnim;
+
+	/** First-person takes (export_fp.py): the hold (a breathing loop), the draw, the reloads and the rifle's bolt cycle. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FVelisectViewmodelClip ViewmodelIdle;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FVelisectViewmodelClip ViewmodelEquip;
+
+	/** Rounds left: swap the magazine. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FVelisectViewmodelClip ViewmodelReload;
+
+	/** Empty: swap the magazine and rack the charging handle. */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FVelisectViewmodelClip ViewmodelReloadEmpty;
+
+	/** Played on the rifle per shot (the bolt carrier cycles). */
+	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Viewmodel")
+	FVelisectViewmodelClip ViewmodelFire;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Animation")
 	TSoftObjectPtr<UAnimSequenceBase> EquipAnim;
@@ -246,8 +278,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Weapon")
 	int32 MagazineSize = 30;
 
+	/** Playback rate of the first-person reloads. */
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Weapon")
-	float ReloadPlayRate = 1.35f;
+	float ReloadPlayRate = 1.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Velisect|Weapon")
 	float RecoilPitch = 0.45f;
@@ -287,8 +320,10 @@ private:
 	void UpdateCamera(float DeltaSeconds);
 	void UpdateViewmodel(float DeltaSeconds, float BobAmplitude);
 	void SetupAnim(UVelisectAnimInstance* Anim, const USkeletalMeshComponent* Skeleton) const;
-	/** Plays a clip on the upper body of the body and the first-person arms (ArmsClip instead, if given); returns its duration. */
-	float PlayUpper(UAnimSequenceBase* Clip, float Rate, bool bLoop, float BlendTime, bool bRestart, UAnimSequenceBase* ArmsClip = nullptr);
+	/** Plays a clip on the body's upper body; returns its duration. */
+	float PlayUpper(UAnimSequenceBase* Clip, float Rate, bool bLoop, float BlendTime, bool bRestart);
+	/** Plays a first-person take on the arms and the rifle together; returns its duration. */
+	float PlayViewmodel(const FVelisectViewmodelClip& Clip, bool bLoop, float BlendTime, float Rate = 1.f);
 	UVelisectAnimInstance* GetVelisectAnim() const;
 	UVelisectAnimInstance* GetArmsAnim() const;
 	UAnimSequenceBase* Loaded(const TSoftObjectPtr<UAnimSequenceBase>& Anim);

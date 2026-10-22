@@ -21,6 +21,7 @@ One trap per bullet, under its topic. `Grep "^## " gotchas.md` for the map.
 
 ## Assets and animation
 - Mixamo FBX through Interchange: bones import lowercase without the `mixamorig:` prefix; `create_physics_asset` on import is ignored (make them with `SkeletalMeshEditorSubsystem.create_physics_asset`).
+- Blender's FBX export writes the scene frame rate (24 by default): set `scene.render.fps` to the takes' rate or Unreal stretches them. Blender 5 actions are slotted: assigning `animation_data.action` also needs `action_slot`.
 - Mixamo takes carry forward travel on the hips (Sprint 3.6 m per cycle); export them in place from Blender.
 - The upper-body layer must blend its root in component space, and the spine's aim pitch is inverted on this rig (see `animation.md`).
 - Vicevoxel crates import at wildly different scales (a 3 m crate): `ue_level.py`'s props are scaled to target heights after placing.
